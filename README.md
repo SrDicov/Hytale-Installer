@@ -1,6 +1,6 @@
 # Hytale Installer
 
-> **Wrapper libre (GPL-3.0-or-later) que descarga, actualiza y lanza el launcher oficial de Hytale de forma nativa en tu distribución**.
+> **Free wrapper (GPL-3.0-or-later) that downloads, updates and launches the official Hytale launcher natively on your distribution**.
 
 <p align="center">
   <img src="icons/256x256/apps/hytale-installer.png" width="128" alt="Hytale H logo">
@@ -10,39 +10,37 @@
 [![Void Linux](https://img.shields.io/badge/Void-xbps-478061.svg)](https://voidlinux.org)
 [![Hytale](https://img.shields.io/badge/Hytale-launcher-0f3460.svg)](https://hytale.com)
 
-**[Español](#español) · [English](#english)**
+**[Español](README.es.md) · English**
 
 ---
 
-### Español
+### What does it do?
 
-#### ¿Qué hace?
+`hytale-installer` is a **100% free (GPL-3)** script that:
 
-`hytale-installer` es un script **100% libre (GPL-3)** que:
-
-1. Verifica que tengas las librerías del launcher (GTK3, webkit2gtk-4.1, libsoup3…) y **te avisa** con el comando nativo de tu distro si falta algo.
-2. Descarga el launcher oficial desde la **URL pública de Hypixel Studios**:
+1. Checks that you have the launcher libraries (GTK3, webkit2gtk-4.1, libsoup3…) and **warns you** with your distro's native command if something is missing.
+2. Downloads the official launcher from **Hypixel Studios' public URL**:
    `https://launcher.hytale.com/builds/release/linux/amd64/hytale-launcher-latest.zip`
-3. Lo actualiza automáticamente en cada ejecución con internet (ETag / versión embebida) y guarda el binario en tu carpeta personal `~/.local/share/hytale-installer/`.
-4. Si no hay internet, abre el binario local sin quejarse. Si es el primer arranque y falla la descarga, **reintenta hasta lograrlo**.
+3. Automatically updates it on every run with internet (ETag / embedded version) and saves the binary to your personal folder `~/.local/share/hytale-installer/`.
+4. If there's no internet, it opens the local binary without complaining. If it's the first run and the download fails, it **retries until it succeeds**.
 
-#### Instalación
+### Installation
 
-**Void Linux (VUR [cnr](https://github.com/Neko-Void-Linux/cnr)) — recomendado:**
+**Void Linux (VUR [cnr](https://github.com/Neko-Void-Linux/cnr)) — recommended:**
 
-Con [vouru](https://github.com/javiercplus/vouru):
+With [vouru](https://github.com/javiercplus/vouru):
 ```bash
 vouru add https://github.com/Neko-Void-Linux/cnr
 vouru install hytale-installer
 ```
 
-Con [vary](https://github.com/SrDicov/Vary):
+With [vary](https://github.com/SrDicov/Vary):
 ```bash
 vary --repo add https://github.com/Neko-Void-Linux/cnr
 vary -S hytale-installer
 ```
 
-**Manual (cualquier distro con bash/curl/unzip):**
+**Manual (any distro with bash/curl/unzip):**
 ```bash
 git clone https://github.com/SrDicov/Hytale-Installer
 cd Hytale-Installer
@@ -56,28 +54,28 @@ done
 # Arch:         sudo pacman -S --needed gtk3 webkit2gtk-4.1 libsoup3 ...
 ```
 
-#### Uso
+### Usage
 
 ```bash
-hytale-installer              # descarga/actualiza si hay internet y lanza
-hytale-installer --check      # solo verifica deps/updates, no lanza
-hytale-installer --no-launch  # prepara todo y sale
+hytale-installer              # downloads/updates if online and launches
+hytale-installer --check      # only checks deps/updates, does not launch
+hytale-installer --no-launch  # prepares everything and exits
 hytale-installer --help
 ```
 
-Variables útiles: `HYTALE_INSTALLER_URL`, `HYTALE_INSTALLER_MAX_RETRIES`, `HYTALE_INSTALLER_NO_LAUNCH=1`, `HYTALE_INSTALLER_OFFLINE=1`.
+Useful variables: `HYTALE_INSTALLER_URL`, `HYTALE_INSTALLER_MAX_RETRIES`, `HYTALE_INSTALLER_NO_LAUNCH=1`, `HYTALE_INSTALLER_OFFLINE=1`.
 
-#### Versionado
+### Versioning
 
-`0.1.0` — `x.0.0` = Cambia con features estables y probados, `0.X.0` = Cambia bugfixes grandes, `0.0.X` = Cambia con bugfixes mínimos.
+`0.1.0` — `x.0.0` = Changes with stable, tested features, `0.X.0` = Changes with major bugfixes, `0.0.X` = Changes with minimal bugfixes.
 
-### Créditos
+### Credits
 
-- **Autor y mantenedor:** Dicov — [SrDicov](https://github.com/SrDicov) — `srdicov@gmail.com`
+- **Author and maintainer:** Dicov — [SrDicov](https://github.com/SrDicov) — `srdicov@gmail.com`
 - **Upstream:** [Hypixel Studios — Hytale](https://hytale.com)
-- **Packaging Void / VUR `cnr`:** [cnr](https://github.com/Neko-Void-Linux/cnr) (gracias a los colaboradores de [Neko Void](https://github.com/Neko-Void-Linux)
-- **Distro base:** [Void Linux](https://voidlinux.org) + `xbps-src`
+- **Void packaging / VUR `cnr`:** [cnr](https://github.com/Neko-Void-Linux/cnr) (thanks to the [Neko Void](https://github.com/Neko-Void-Linux) contributors)
+- **Base distro:** [Void Linux](https://voidlinux.org) + `xbps-src`
 
-### Licencia
+### License
 
-GPL-3.0-or-later — ver [LICENSE](LICENSE) y [NOTICE](NOTICE). Texto completo: <https://www.gnu.org/licenses/gpl-3.0.txt>
+GPL-3.0-or-later — see [LICENSE](LICENSE) and [NOTICE](NOTICE). Full text: <https://www.gnu.org/licenses/gpl-3.0.txt>
