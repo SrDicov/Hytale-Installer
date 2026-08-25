@@ -69,13 +69,13 @@ Variables útiles: `HYTALE_INSTALLER_URL`, `HYTALE_INSTALLER_MAX_RETRIES`, `HYTA
 
 #### Versionado
 
-`0.1.0` — `0` = estable 100% probado, `0.X.0` = usable con features nuevos, `0.0.X` = bugfixes mínimos.
+`0.1.0` — `x.0.0` = Cambia con features estables y probados, `0.X.0` = Cambia bugfixes grandes, `0.0.X` = Cambia con bugfixes mínimos.
 
 ### Créditos
 
 - **Autor y mantenedor:** Dicov — [SrDicov](https://github.com/SrDicov) — `srdicov@gmail.com`
 - **Upstream:** [Hypixel Studios — Hytale](https://hytale.com)
-- **Packaging Void / VUR `cnr`:** [Neko Void Linux](https://github.com/Neko-Void-Linux/cnr) (gracias a JavierCplus y colaboradores de Neko Void)
+- **Packaging Void / VUR `cnr`:** [cnr](https://github.com/Neko-Void-Linux/cnr) (gracias a los colaboradores de [Neko Void](https://github.com/Neko-Void-Linux)
 - **Distro base:** [Void Linux](https://voidlinux.org) + `xbps-src`
 
 ### Licencia
