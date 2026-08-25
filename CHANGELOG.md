@@ -9,3 +9,6 @@ Todas las notas en <https://github.com/SrDicov/Hytale-Installer/releases>.
 
 ## [0.1.1] - 2026-08-25
 - feat: `hytale-installer --purge` per-usuario y `post_remove` del paquete que borra TODO en desinstalación (wrapper + `~/.local/share/Hytale` etc., GBs).
+
+## [0.1.2] - 2026-08-25
+- fix: purge también limpia ~/.cache/hytale-launcher legacy.

@@ -31,7 +31,7 @@
 
 set -uo pipefail
 
-SCRIPT_VERSION="0.1.1"
+SCRIPT_VERSION="0.1.2"
 
 # ─── constantes ─────────────────────────────────────────────────────────
 _UPSTREAM_URL_DEFAULT="https://launcher.hytale.com/builds/release/linux/amd64/hytale-launcher-latest.zip"
