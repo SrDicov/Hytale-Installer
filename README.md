@@ -29,6 +29,7 @@
 #### Instalación
 
 **Void Linux (VUR [cnr](https://github.com/Neko-Void-Linux/cnr)) — recomendado:**
+
 Con [vouru](https://github.com/javiercplus/vouru):
 ```bash
 vouru add https://github.com/Neko-Void-Linux/cnr
