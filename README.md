@@ -28,11 +28,17 @@
 
 #### Instalación
 
-**Void Linux (VUR `cnr`) — recomendado:**
+**Void Linux (VUR [cnr](https://github.com/Neko-Void-Linux/cnr)) — recomendado:**
+Con [vouru](https://github.com/javiercplus/vouru):
 ```bash
-vary/vouru -S hytale-installer
-# o manualmente:
-# xbps-install -S hytale-installer
+vouru add https://github.com/Neko-Void-Linux/cnr
+vouru install hytale-installer
+```
+
+Con [vary](https://github.com/SrDicov/Vary):
+```bash
+vary --repo add https://github.com/Neko-Void-Linux/cnr
+vary -S hytale-installer
 ```
 
 **Manual (cualquier distro con bash/curl/unzip):**
@@ -64,63 +70,11 @@ Variables útiles: `HYTALE_INSTALLER_URL`, `HYTALE_INSTALLER_MAX_RETRIES`, `HYTA
 
 `0.1.0` — `0` = estable 100% probado, `0.X.0` = usable con features nuevos, `0.0.X` = bugfixes mínimos.
 
----
-
-### English
-
-#### What does it do?
-
-`hytale-installer` is a **100% free (GPL-3)** script that:
-
-1. Checks that you have the launcher's libraries (GTK3, webkit2gtk-4.1, libsoup3…) and **notifies you** with your distro's native command if something is missing.
-2. Downloads the official launcher from Hypixel Studios' **public URL**:
-   `https://launcher.hytale.com/builds/release/linux/amd64/hytale-launcher-latest.zip`
-3. Automatically updates it on every run with internet (ETag / embedded version) and saves the binary in your home folder `~/.local/share/hytale-installer/`.
-4. If there is no internet, opens the local binary without complaining. If it's the first run and the download fails, **retries until it succeeds**.
-
-#### Installation
-
-**Void Linux (VUR `cnr`) — recommended:**
-```bash
-vary/vouru -S hytale-installer
-# or manually:
-# xbps-install -S hytale-installer
-```
-
-**Manual (any distro with bash/curl/unzip):**
-```bash
-git clone https://github.com/SrDicov/Hytale-Installer
-cd Hytale-Installer
-sudo install -Dm755 hytale-installer /usr/bin/hytale-installer
-sudo install -Dm644 hytale-installer.desktop /usr/share/applications/hytale-installer.desktop
-for s in 24 32 48 64 128 256 512; do
-  sudo install -Dm644 icons/${s}x${s}/apps/hytale-installer.png /usr/share/icons/hicolor/${s}x${s}/apps/hytale-installer.png
-done
-# Debian/Ubuntu: sudo apt install libgtk-3-0 libwebkit2gtk-4.1-0 libsoup-3.0-0 ...
-# Fedora:       sudo dnf install gtk3 webkit2gtk4.1 libsoup3 ...
-# Arch:         sudo pacman -S --needed gtk3 webkit2gtk-4.1 libsoup3 ...
-```
-
-#### Usage
-
-```bash
-hytale-installer              # downloads/updates if there is internet and launches
-hytale-installer --check      # only checks deps/updates, does not launch
-hytale-installer --no-launch  # prepares everything and exits
-hytale-installer --help
-```
-
-Useful variables: `HYTALE_INSTALLER_URL`, `HYTALE_INSTALLER_MAX_RETRIES`, `HYTALE_INSTALLER_NO_LAUNCH=1`, `HYTALE_INSTALLER_OFFLINE=1`.
-
-#### Versioning
-
-`0.1.0` — `0` = stable 100% tested, `0.X.0` = usable with new features, `0.0.X` = minimal bugfixes.
-
 ### Créditos
 
 - **Autor y mantenedor:** Dicov — [SrDicov](https://github.com/SrDicov) — `srdicov@gmail.com`
 - **Upstream:** [Hypixel Studios — Hytale](https://hytale.com)
-- **Packaging Void / VUR `cnr`:** [Neko Void Linux](https://github.com/Neko-Void-Linux/cnr) (gracias a JavierCplus y colaboradores)
+- **Packaging Void / VUR `cnr`:** [Neko Void Linux](https://github.com/Neko-Void-Linux/cnr) (gracias a JavierCplus y colaboradores de Neko Void)
 - **Distro base:** [Void Linux](https://voidlinux.org) + `xbps-src`
 
 ### Licencia
