@@ -66,7 +66,7 @@ do_purge() {
     # juego — visto en logs reales del launcher
     targets+=("$HOME/.local/share/Hytale" "$HOME/.cache/Hytale" "$HOME/.config/Hytale")
     # legacy del template viejo
-    targets+=("$HOME/.local/share/hytale-launcher")
+    targets+=("$HOME/.local/share/hytale-launcher" "$HOME/.cache/hytale-launcher")
     # variantes XDG no estándar
     [ -n "${XDG_DATA_HOME:-}" ]   && targets+=("$XDG_DATA_HOME/hytale-installer" "$XDG_DATA_HOME/Hytale")
     [ -n "${XDG_CACHE_HOME:-}" ]  && targets+=("$XDG_CACHE_HOME/hytale-installer" "$XDG_CACHE_HOME/Hytale")
