@@ -57,6 +57,61 @@ _err()  { printf '[hytale-installer][ERROR] %s\n' "$*" >&2; }
 
 has_cmd() { command -v "$1" >/dev/null 2>&1; }
 
+do_purge() {
+    local yes=0
+    for a in "$@"; do case "$a" in --yes|-y) yes=1;; esac; done
+    local -a targets=()
+    # wrapper
+    targets+=("$DATA_DIR" "$CACHE_DIR")
+    # juego — visto en logs reales del launcher
+    targets+=("$HOME/.local/share/Hytale" "$HOME/.cache/Hytale" "$HOME/.config/Hytale")
+    # legacy del template viejo
+    targets+=("$HOME/.local/share/hytale-launcher")
+    # variantes XDG no estándar
+    [ -n "${XDG_DATA_HOME:-}" ]   && targets+=("$XDG_DATA_HOME/hytale-installer" "$XDG_DATA_HOME/Hytale")
+    [ -n "${XDG_CACHE_HOME:-}" ]  && targets+=("$XDG_CACHE_HOME/hytale-installer" "$XDG_CACHE_HOME/Hytale")
+    [ -n "${XDG_CONFIG_HOME:-}" ] && targets+=("$XDG_CONFIG_HOME/Hytale")
+
+    # deduplicar + solo existentes
+    local -a existing=() t
+    declare -A seen=()
+    for t in "${targets[@]}"; do
+        [ -z "$t" ] && continue
+        # seguridad: nunca borrar $HOME a secas
+        case "$t" in "$HOME"|"$HOME/"|"/"|"") continue;; esac
+        [ -e "$t" ] || continue
+        [ -n "${seen["$t"]:-}" ] && continue
+        seen["$t"]=1
+        existing+=("$t")
+    done
+
+    # lock
+    existing+=("$LOCK_FILE")
+    # filtrar locks inexistentes al final para mensaje limpio
+    local total=0
+    for t in "${existing[@]}"; do [ -e "$t" ] && total=$((total+1)); done
+    if [ "$total" -eq 0 ]; then
+        _log "Nada que purgar — no hay datos de Hytale/hytale-installer en este usuario."
+        return 0
+    fi
+
+    _log "Se borrará TODO (wrapper + juego, GBs):"
+    for t in "${existing[@]}"; do [ -e "$t" ] && printf '  %s\n' "$t" >&2; done
+
+    if [ "$yes" -eq 0 ]; then
+        printf '[hytale-installer] ¿Borrar definitivamente? [y/N] ' >&2
+        read -r ans
+        case "$ans" in y|Y|yes|s|S|si) ;; *) _log "Cancelado."; return 1;; esac
+    fi
+
+    local p
+    for p in "${existing[@]}"; do
+        [ -e "$p" ] || continue
+        rm -rf -- "$p" 2>/dev/null && _log "Borrado $p" || _warn "No se pudo borrar $p"
+    done
+    _log "Purge completado."
+}
+
 usage() {
     cat <<EOF
 hytale-installer ${SCRIPT_VERSION} — wrapper GPL-3 para el launcher oficial de Hytale
@@ -70,6 +125,9 @@ Opciones:
   -V, --version    Versión del wrapper
       --check      Verifica dependencias y actualizaciones, no lanza el juego
       --no-launch  Prepara/actualiza todo pero no ejecuta el juego
+      --purge [--yes]  Borra TODO: ~/.local/share/hytale-installer,
+                      ~/.cache/hytale-installer, ~/.local/share/Hytale,
+                      ~/.cache/Hytale, ~/.config/Hytale (GBs)
 
 Sin sudo: las dependencias que falten se informan con el comando nativo
 de tu distro. Sin internet usa el binario local ya instalado.
@@ -370,6 +428,7 @@ do_launch() {
 
 main() {
     local check_only=0
+    local purge=0 purge_yes=0
     local -a pass_args=()
 
     while [ $# -gt 0 ]; do
@@ -378,11 +437,20 @@ main() {
             -V|--version) echo "hytale-installer $SCRIPT_VERSION"; exit 0 ;;
             --check)      check_only=1 ;;
             --no-launch)  NO_LAUNCH=1 ;;
+            --purge)      purge=1 ;;
+            --yes|-y)     purge_yes=1 ;;
             --)           shift; pass_args=("$@"); break ;;
+            --purge=*|--yes=*) _err "Usa --purge --yes (separados)"; exit 1;;
+            -*)           _err "Opción desconocida: $1 (usa --help)"; exit 1;;
             *)            pass_args=("$@"); break ;;
         esac
         shift
     done
+
+    if [ "$purge" -eq 1 ]; then
+        if [ "$purge_yes" -eq 1 ]; then do_purge --yes; else do_purge; fi
+        exit $?
+    fi
 
     mkdir -p "$DATA_DIR" "$CACHE_DIR"
 
