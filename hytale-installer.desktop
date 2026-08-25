@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=Hytale
+GenericName=Hytale Launcher
+Comment=Lanza Hytale; descarga y mantiene actualizado el launcher oficial desde hytale.com
+Exec=hytale-installer %U
+Icon=hytale-installer
+Terminal=false
+Type=Application
+Categories=Game;
+StartupWMClass=Hytale
+Keywords=hytale;game;launcher;
+MimeType=x-scheme-handler/hytale;

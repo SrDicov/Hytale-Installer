@@ -1,0 +1,7 @@
+.cache/
+*.xbps
+hostdir/
+distfiles/
+*.part
+__pycache__/
+.DS_Store

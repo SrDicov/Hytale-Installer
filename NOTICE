@@ -1,0 +1,27 @@
+hytale-installer — GPL-3.0-or-later, Copyright (c) 2026 Dicov (SrDicov)
+
+TRADEMARK NOTICE
+----------------
+Hytale and all related assets (launcher binary, hytale.com,
+launcher.hytale.com) are the exclusive intellectual property of
+Hypixel Studios. This project has no affiliation with Hypixel Studios.
+
+This wrapper script is independent free software. It does NOT contain,
+bundle or redistribute the proprietary Hytale launcher. On first run
+(and on every subsequent run with internet) it fetches the launcher
+from the official public URL above, verifies the zip, and installs the
+binary to the user's XDG data directory (~/.local/share/hytale-installer/).
+
+If you are a rights holder and believe this mechanism is inappropriate,
+please open an issue at https://github.com/SrDicov/Vary (or contact
+srdicov@gmail.com) and it will be addressed immediately.
+
+License of this wrapper: GPL-3.0-or-later. See LICENSE file.
+
+ICON NOTICE
+-----------
+The package icon is the official Hytale "H" emblem (source: hytale.com),
+included solely for identification of the game this wrapper launches
+(nominative use). All rights, title and interest in that artwork belong to
+Hypixel Studios; no affiliation or endorsement is implied, and the icon is
+NOT licensed under the GPL. The wrapper script itself remains GPL-3.0.

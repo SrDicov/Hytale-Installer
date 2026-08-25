@@ -1,0 +1,424 @@
+#!/usr/bin/env bash
+# hytale-installer — GPL-3.0-or-later, Copyright (c) 2026 Dicov (SrDicov) <https://github.com/SrDicov>
+#
+# ███ AVISO DE MARCA / PROPIEDAD INTELECTUAL ████████████████████████████
+# Hytale, su logotipo, el binario del launcher y los sitios https://hytale.com
+# y https://launcher.hytale.com son propiedad intelectual privada de
+# Hypixel Studios. Este script NO redistribuye ni empaqueta material
+# propietario: en tiempo de ejecución descarga el launcher oficial desde la
+# URL pública publicada por Hypixel Studios:
+#
+#   https://launcher.hytale.com/builds/release/linux/amd64/hytale-launcher-latest.zip
+#
+# El script es software libre 100% bajo GPL-3.0. Se evita deliberadamente
+# distribuir el binario upstream por repos públicos.
+# ██████████████████████████████████████████████████████████████████████
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version. See <https://www.gnu.org/licenses/gpl-3.0.txt>.
+#
+# Diseño: seguro, tolerante a fallos de red, auto-actualizable, SIN sudo.
+# Las dependencias del sistema solo se verifican y se avisa al usuario con
+# el comando nativo de su distro; nunca se instalan automáticamente.
+#
+# Variables de entorno opcionales:
+#   HYTALE_INSTALLER_URL          URL upstream alternativa (tests/mirror)
+#   HYTALE_INSTALLER_MAX_RETRIES  límite de reintentos del primer arranque (0|vacío = infinito)
+#   HYTALE_INSTALLER_NO_LAUNCH=1  prepara todo pero no ejecuta el juego
+#   HYTALE_INSTALLER_OFFLINE=1    fuerza el modo offline (usa binario local)
+
+set -uo pipefail
+
+SCRIPT_VERSION="0.1.0"
+
+# ─── constantes ─────────────────────────────────────────────────────────
+_UPSTREAM_URL_DEFAULT="https://launcher.hytale.com/builds/release/linux/amd64/hytale-launcher-latest.zip"
+UPSTREAM_URL="${HYTALE_INSTALLER_URL:-$_UPSTREAM_URL_DEFAULT}"
+UPSTREAM_NAME="hytale-launcher"
+DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/hytale-installer"
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/hytale-installer"
+BIN_PATH="$DATA_DIR/$UPSTREAM_NAME"
+VERSION_FILE="$DATA_DIR/version.txt"
+ETAG_FILE="$CACHE_DIR/etag.txt"
+ZIP_PATH="$CACHE_DIR/${UPSTREAM_NAME}-latest.zip"
+LOCK_FILE="${XDG_RUNTIME_DIR:-/tmp}/hytale-installer-$USER.lock"
+RETRY_BASE_SEC=5
+RETRY_MAX_SEC=30
+MAX_RETRIES_FIRST_RUN="${HYTALE_INSTALLER_MAX_RETRIES:-0}"   # 0 = infinito
+FORCE_OFFLINE="${HYTALE_INSTALLER_OFFLINE:-0}"
+NO_LAUNCH="${HYTALE_INSTALLER_NO_LAUNCH:-0}"
+
+# ─── helpers ────────────────────────────────────────────────────────────
+_log()  { printf '[hytale-installer] %s\n' "$*" >&2; }
+_warn() { printf '[hytale-installer][AVISO] %s\n' "$*" >&2; }
+_err()  { printf '[hytale-installer][ERROR] %s\n' "$*" >&2; }
+
+has_cmd() { command -v "$1" >/dev/null 2>&1; }
+
+usage() {
+    cat <<EOF
+hytale-installer ${SCRIPT_VERSION} — wrapper GPL-3 para el launcher oficial de Hytale
+Copyright (c) 2026 Dicov (SrDicov). Hytale es propiedad de Hypixel Studios;
+este script solo descarga el launcher desde la URL pública oficial.
+
+Uso: hytale-installer [opciones] [-- args-del-juego]
+
+Opciones:
+  -h, --help       Esta ayuda
+  -V, --version    Versión del wrapper
+      --check      Verifica dependencias y actualizaciones, no lanza el juego
+      --no-launch  Prepara/actualiza todo pero no ejecuta el juego
+
+Sin sudo: las dependencias que falten se informan con el comando nativo
+de tu distro. Sin internet usa el binario local ya instalado.
+EOF
+}
+
+detect_distro() {
+    if [ -r /etc/os-release ]; then
+        # shellcheck disable=SC1091
+        . /etc/os-release
+        case "${ID:-}" in
+            void)                               echo void;     return ;;
+            debian)                             echo debian;   return ;;
+            ubuntu)                             echo ubuntu;   return ;;
+            fedora|rhel|centos|rocky|almalinux) echo fedora;   return ;;
+            arch|manjaro|endeavouros)           echo arch;     return ;;
+            opensuse*|tumbleweed|leap)          echo opensuse; return ;;
+        esac
+        case "${ID_LIKE:-}" in
+            *debian*)         echo debian; return ;;
+            *fedora*|*rhel*)  echo fedora; return ;;
+            *arch*)           echo arch;   return ;;
+        esac
+    fi
+    if   has_cmd xbps-install; then echo void
+    elif has_cmd apt-get;      then echo debian
+    elif has_cmd dnf;          then echo fedora
+    elif has_cmd pacman;       then echo arch
+    elif has_cmd zypper;       then echo opensuse
+    else                            echo generic
+    fi
+}
+
+suggest_install_cmd() {
+    local distro="$1" pkgs="$2"
+    case "$distro" in
+        void)          echo "doas xbps-install -Sy $pkgs    # o con sudo: sudo xbps-install -Sy $pkgs" ;;
+        debian|ubuntu) echo "sudo apt update && sudo apt install -y $pkgs" ;;
+        fedora)        echo "sudo dnf install -y $pkgs" ;;
+        arch)          echo "sudo pacman -S --needed $pkgs" ;;
+        opensuse)      echo "sudo zypper install -y $pkgs" ;;
+        *)             echo "instala estos paquetes con el gestor de tu distro: $pkgs" ;;
+    esac
+}
+
+# ─── dependencias: SOLO avisa, jamás instala ni usa sudo ────────────────
+check_and_warn_deps() {
+    local distro="$1" missing="" pkg
+    local -a pkgs=()
+
+    case "$distro" in
+        void)
+            pkgs=(gtk+3 libwebkit2gtk41 libsoup3 gdk-pixbuf glib glib-networking
+                  gsettings-desktop-schemas xdg-utils hicolor-icon-theme
+                  curl unzip ca-certificates bash) ;;
+        debian|ubuntu)
+            pkgs=(libgtk-3-0 libwebkit2gtk-4.1-0 libsoup-3.0-0 libgdk-pixbuf-2.0-0
+                  libglib2.0-0 glib-networking gsettings-desktop-schemas
+                  xdg-utils hicolor-icon-theme curl unzip ca-certificates bash) ;;
+        fedora)
+            pkgs=(gtk3 webkit2gtk4.1 libsoup3 gdk-pixbuf2 glib2 glib-networking
+                  gsettings-desktop-schemas xdg-utils hicolor-icon-theme
+                  curl unzip ca-certificates bash) ;;
+        arch)
+            pkgs=(gtk3 webkit2gtk-4.1 libsoup3 gdk-pixbuf2 glib2 glib-networking
+                  gsettings-desktop-schemas xdg-utils hicolor-icon-theme
+                  curl unzip ca-certificates bash) ;;
+        opensuse)
+            pkgs=(gtk3 webkit2gtk-4_1 libsoup-3_0 gdk-pixbuf glib2 glib-networking
+                  gsettings-desktop-schemas xdg-utils hicolor-icon-theme
+                  curl unzip ca-certificates bash) ;;
+        *)
+            # distro desconocida: al menos las herramientas del propio script
+            for pkg in curl unzip bash; do has_cmd "$pkg" || missing="$missing $pkg"; done
+            if [ -n "$missing" ]; then
+                _warn "Faltan herramientas del script:$missing — $(suggest_install_cmd "$distro" "$missing")"
+                return 1
+            fi
+            return 0 ;;
+    esac
+
+    for pkg in "${pkgs[@]}"; do
+        case "$distro" in
+            void)          xbps-query "$pkg"      >/dev/null 2>&1 || missing="$missing $pkg" ;;
+            debian|ubuntu) dpkg -s "$pkg"         >/dev/null 2>&1 || missing="$missing $pkg" ;;
+            fedora)        rpm  -q "$pkg"         >/dev/null 2>&1 || missing="$missing $pkg" ;;
+            arch)          pacman -Q "$pkg"       >/dev/null 2>&1 || missing="$missing $pkg" ;;
+            opensuse)      rpm  -q "$pkg"         >/dev/null 2>&1 || missing="$missing $pkg" ;;
+        esac
+    done
+
+    # herramientas imprescindibles aunque la distro las llame distinto
+    for tool in curl unzip; do
+        has_cmd "$tool" || { has_cmd wget || missing="$missing $tool(falta también wget)"; }
+    done
+
+    missing="${missing# }"
+    if [ -n "$missing" ]; then
+        _warn "Faltan paquetes para garantizar el funcionamiento de Hytale:$missing"
+        _warn "Instálalos tú misma/o con:"
+        _warn "    $(suggest_install_cmd "$distro" "$missing")"
+        _warn "Se continuará igualmente; si el launcher falla por librerías, instala lo indicado."
+        return 1
+    fi
+    _log "Dependencias OK ($distro)."
+    return 0
+}
+
+has_internet() {
+    [ "$FORCE_OFFLINE" = "1" ] && return 1
+    if has_cmd curl; then
+        curl -Is --max-time 5 --connect-timeout 5 "$UPSTREAM_URL" 2>/dev/null | head -n1 | grep -q "200"
+    elif has_cmd wget; then
+        wget --spider --timeout=5 -q "$UPSTREAM_URL" 2>/dev/null
+    else
+        return 1
+    fi
+}
+
+get_local_version() {
+    if [ -x "$BIN_PATH" ]; then
+        strings "$BIN_PATH" 2>/dev/null \
+            | grep -oE '20[0-9]{2}\.[0-9]{2}\.[0-9]{2}-[0-9a-f]{7}' | head -n1
+    fi
+}
+
+_version_of() {
+    strings "$1" 2>/dev/null \
+        | grep -oE '20[0-9]{2}\.[0-9]{2}\.[0-9]{2}-[0-9a-f]{7}' | head -n1
+}
+
+# fetch_upstream <dest-zip>
+#   return 0 = zip nuevo descargado y validado (guarda ETag nuevo)
+#   return 2 = 304 Not Modified (lo que hay en caché sigue vigente)
+#   return 1 = fallo de red/descarga
+fetch_upstream() {
+    local dest="$1" tmp_dl hdr code
+    tmp_dl="${dest}.part"
+    hdr=""
+    mkdir -p "$(dirname "$dest")"
+    rm -f "$tmp_dl"
+
+    if has_cmd curl; then
+        hdr="$(mktemp)"
+        local -a etag_args=()
+        if [ -s "$ETAG_FILE" ]; then
+            etag_args=(-H "If-None-Match: $(cat "$ETAG_FILE")")
+        fi
+        code="$(curl -sS -L --connect-timeout 15 --max-time 300 --retry 2 \
+                     "${etag_args[@]}" -D "$hdr" -o "$tmp_dl" \
+                     -w '%{http_code}' "$UPSTREAM_URL" 2>/dev/null)"
+        if [ "$code" = "304" ]; then
+            rm -f "$tmp_dl" "$hdr"
+            return 2
+        fi
+        if [ "$code" != "200" ] || [ ! -s "$tmp_dl" ]; then
+            rm -f "$tmp_dl" "$hdr"
+            return 1
+        fi
+        # guardar ETag para próximas comprobaciones baratas
+        awk 'tolower($1)=="etag:"{sub(/\r$/,"",$2); print $2; exit}' "$hdr" > "$ETAG_FILE"
+        rm -f "$hdr"
+    elif has_cmd wget; then
+        if ! wget -q -O "$tmp_dl" --timeout=15 --tries=2 "$UPSTREAM_URL" 2>/dev/null; then
+            rm -f "$tmp_dl"
+            return 1
+        fi
+    else
+        _err "Ni curl ni wget disponibles — no se puede descargar."
+        return 1
+    fi
+
+    if ! has_cmd unzip || ! unzip -t -q "$tmp_dl" >/dev/null 2>&1; then
+        _err "El zip descargado está corrupto o falta unzip."
+        rm -f "$tmp_dl"
+        return 1
+    fi
+    mv -f "$tmp_dl" "$dest"
+    return 0
+}
+
+install_from_zip() {
+    local zip="$1" tmpdir bin_src ver
+    tmpdir="$(mktemp -d)" || return 1
+
+    if ! unzip -o -q "$zip" -d "$tmpdir" >/dev/null 2>&1; then
+        _err "No se pudo descomprimir $zip"
+        rm -rf "$tmpdir"
+        return 1
+    fi
+    bin_src="$(find "$tmpdir" -type f -name "$UPSTREAM_NAME" | head -n1)"
+    if [ -z "$bin_src" ]; then
+        bin_src="$(find "$tmpdir" -type f -perm -u+x | head -n1)"
+    fi
+    if [ -z "$bin_src" ] || [ ! -f "$bin_src" ]; then
+        _err "Binario '$UPSTREAM_NAME' no encontrado dentro del zip."
+        rm -rf "$tmpdir"
+        return 1
+    fi
+
+    ver="$(_version_of "$bin_src")"
+    mkdir -p "$DATA_DIR"
+    # instalar atómicamente: mismo filesystem => mv es atómico
+    local staged="$DATA_DIR/.staged-$UPSTREAM_NAME.$$"
+    if ! install -m 0755 "$bin_src" "$staged"; then
+        rm -rf "$tmpdir"
+        return 1
+    fi
+    mv -f "$staged" "$BIN_PATH"
+    if [ -n "$ver" ]; then printf '%s\n' "$ver" > "$VERSION_FILE"; fi
+    rm -rf "$tmpdir"
+    _log "Instalado $UPSTREAM_NAME ${ver:-versión desconocida} en $BIN_PATH"
+    return 0
+}
+
+# primer arranque sin binario: reintenta hasta lograrlo (infinito por defecto)
+first_run_loop() {
+    local attempt=1 delay=$RETRY_BASE_SEC
+    while true; do
+        _log "Descargando Hytale launcher (intento $attempt)..."
+        if fetch_upstream "$ZIP_PATH" && install_from_zip "$ZIP_PATH"; then
+            _log "Descarga inicial completada."
+            return 0
+        fi
+        if [ "$MAX_RETRIES_FIRST_RUN" != "0" ] && [ "$attempt" -ge "$MAX_RETRIES_FIRST_RUN" ]; then
+            _err "Agotados los reintentos ($attempt) sin conseguir el binario."
+            return 1
+        fi
+        _log "Reintento en ${delay}s (Ctrl-C para cancelar)..."
+        sleep "$delay"
+        delay=$(( delay * 2 )); [ "$delay" -gt "$RETRY_MAX_SEC" ] && delay=$RETRY_MAX_SEC
+        attempt=$(( attempt + 1 ))
+    done
+}
+
+ensure_binary() {
+    mkdir -p "$DATA_DIR" "$CACHE_DIR"
+
+    if [ ! -x "$BIN_PATH" ]; then
+        if ! has_internet; then
+            _err "Primer arranque sin binario y sin internet. Conéctate: se reintentará hasta lograr la descarga."
+            # requisito: reintentar hasta lograrlo incluso si "no hay internet" ahora
+            FORCE_OFFLINE=0
+        fi
+        first_run_loop
+        return $?
+    fi
+
+    if ! has_internet; then
+        _log "Sin internet — usando binario local ($(get_local_version || echo versión desconocida))."
+        return 0
+    fi
+
+    _log "Comprobando actualizaciones..."
+    local local_ver remote_bin_dir remote_bin remote_ver st
+    local_ver="$(get_local_version)"
+    st=0
+    fetch_upstream "$ZIP_PATH" || st=$?
+    case "$st" in
+        2)
+            _log "Binario ya en la última versión (${local_ver:-desconocida}) [cacheado]."
+            return 0 ;;
+        1)
+            _warn "No se pudo comprobar/descargar actualización — se usará la versión local."
+            return 0 ;;
+    esac
+
+    # zip nuevo: comparar versión antes de sustituir (por si upstream retrocede)
+    remote_bin_dir="$(mktemp -d)" || return 0
+    if unzip -o -q "$ZIP_PATH" -d "$remote_bin_dir" >/dev/null 2>&1; then
+        remote_bin="$(find "$remote_bin_dir" -type f -name "$UPSTREAM_NAME" | head -n1)"
+        [ -z "$remote_bin" ] && remote_bin="$(find "$remote_bin_dir" -type f -perm -u+x | head -n1)"
+        remote_ver="$([ -n "$remote_bin" ] && _version_of "$remote_bin" || true)"
+        rm -rf "$remote_bin_dir"
+        if [ -z "$remote_ver" ] || [ "$remote_ver" != "$local_ver" ]; then
+            _log "Nueva versión: ${local_ver:-ninguna} → ${remote_ver:-desconocida} — actualizando..."
+            if install_from_zip "$ZIP_PATH"; then
+                _log "Actualizado correctamente."
+            else
+                _warn "Fallo al instalar la actualización — se conserva ${local_ver:-el binario actual}."
+            fi
+        else
+            _log "Upstream ofrece la misma versión (${local_ver}); nada que hacer."
+        fi
+    else
+        rm -rf "$remote_bin_dir"
+        _warn "Zip de actualización ilegible — se ignora y se usa la versión local."
+    fi
+    return 0
+}
+
+do_launch() {
+    _log "Lanzando Hytale..."
+    export WEBKIT_DISABLE_COMPOSITING_MODE=1
+    cd "$DATA_DIR"
+    exec "$BIN_PATH" "$@"
+}
+
+main() {
+    local check_only=0
+    local -a pass_args=()
+
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -h|--help)    usage; exit 0 ;;
+            -V|--version) echo "hytale-installer $SCRIPT_VERSION"; exit 0 ;;
+            --check)      check_only=1 ;;
+            --no-launch)  NO_LAUNCH=1 ;;
+            --)           shift; pass_args=("$@"); break ;;
+            *)            pass_args=("$@"); break ;;
+        esac
+        shift
+    done
+
+    mkdir -p "$DATA_DIR" "$CACHE_DIR"
+
+    # una sola instancia actualizando a la vez
+    if has_cmd flock; then
+        eval "exec 9>\"$LOCK_FILE\""
+        if ! flock -n 9 2>/dev/null; then
+            _log "Otra instancia está activa — esperando turno..."
+            flock 9 2>/dev/null || true
+        fi
+    fi
+
+    local distro
+    distro="$(detect_distro)"
+    _log "Distro detectada: $distro"
+
+    check_and_warn_deps "$distro" || true   # solo avisa; nunca aborta ni usa sudo
+
+    ensure_binary || { _err "No se pudo obtener el binario. Revisa conexión y reintenta."; exit 1; }
+
+    if [ ! -x "$BIN_PATH" ]; then
+        _err "Binario no disponible en $BIN_PATH"
+        exit 1
+    fi
+
+    if [ "$check_only" = "1" ]; then
+        _log "--check OK: binario presente ($(get_local_version || echo '?')), deps avisadas si faltaban."
+        exit 0
+    fi
+
+    [ "$NO_LAUNCH" = "1" ] && { _log "NO_LAUNCH activo — listo en $BIN_PATH"; exit 0; }
+
+    do_launch "${pass_args[@]}"
+}
+
+# permite `source hytale-installer` en tests sin ejecutar nada
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+    main "$@"
+fi
