@@ -6,3 +6,6 @@ Todas las notas en <https://github.com/SrDicov/Hytale-Installer/releases>.
 - Inicial: wrapper GPL-3, auto-update con ETag + versión embebida, fallback offline.
 - Soporte multi-distro (Void/Debian/Fedora/Arch/openSUSE) con aviso de deps por gestor nativo.
 - Empaquetado Void `hytale-installer` (VUR cnr) con icono oficial "H" y entrada de escritorio `Name=Hytale`.
+
+## [0.1.1] - 2026-08-25
+- feat: `hytale-installer --purge` per-usuario y `post_remove` del paquete que borra TODO en desinstalación (wrapper + `~/.local/share/Hytale` etc., GBs).
