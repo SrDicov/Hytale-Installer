@@ -21,6 +21,15 @@ depends="bash curl unzip ca-certificates
  gtk+3 libwebkit2gtk41 libsoup3 gdk-pixbuf glib glib-networking
  gsettings-desktop-schemas xdg-utils hicolor-icon-theme"
 
+do_extract() {
+	# GitHub archive → Hytale-Installer-v${version} pero wrksrc sin 'v'
+	# fetch style ya descargó el tarball a SRCDISTDIR; lo descomprimimos
+	# manualmente con strip-components=1 al wrksrc correcto.
+	mkdir -p "${wrksrc}"
+	bsdtar -xf "${XBPS_SRCDISTDIR}/${pkgname}-${version}/hytale-installer-${version}.tar.gz" \
+		-C "${wrksrc}" --strip-components=1
+}
+
 do_install() {
 	vbin hytale-installer
 	vinstall hytale-installer.desktop 0644 usr/share/applications
