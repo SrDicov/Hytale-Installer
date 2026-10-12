@@ -264,7 +264,7 @@ _version_of() {
 #   return 2 = 304 Not Modified (lo que hay en caché sigue vigente)
 #   return 1 = fallo de red/descarga
 fetch_upstream() {
-    local dest="$1" tmp_dl hdr code
+    local dest="$1" tmp_dl hdr code _off
     tmp_dl="${dest}.part"
     hdr=""
     mkdir -p "$(dirname "$dest")"
@@ -273,7 +273,7 @@ fetch_upstream() {
     if has_cmd curl; then
         hdr="$(mktemp)"
         local -a etag_args=()
-        if [ -s "$ETAG_FILE" ]; then
+        if [ -s "$ETAG_FILE" ] && [ -s "$dest" ]; then
             etag_args=(-H "If-None-Match: $(cat "$ETAG_FILE")")
         fi
         code="$(curl -sS -L --connect-timeout 15 --max-time 300 --retry 2 \
@@ -284,12 +284,18 @@ fetch_upstream() {
             return 2
         fi
         if [ "$code" != "200" ] || [ ! -s "$tmp_dl" ]; then
+            _warn "Descarga fallida (HTTP ${code:-sin respuesta})."
             rm -f "$tmp_dl" "$hdr"
             return 1
         fi
-        # guardar ETag para próximas comprobaciones baratas
-        awk 'tolower($1)=="etag:"{sub(/\r$/,"",$2); print $2; exit}' "$hdr" > "$ETAG_FILE"
-        rm -f "$hdr"
+        # upstream antepone cabecera HYTALE-UPDATE al zip: recortarla antes de validar
+        # ponytail: busca la primera firma PK; si Hypixel cambia el formato, revisar este bloque
+        if [ "$(head -c 13 "$tmp_dl" 2>/dev/null)" = "HYTALE-UPDATE" ]; then
+            _off="$(LC_ALL=C grep -aobF "$(printf 'PK\003\004')" "$tmp_dl" | head -n1 | cut -d: -f1)"
+            if [ -n "${_off:-}" ]; then
+                tail -c +$((_off + 1)) "$tmp_dl" > "$tmp_dl.clean" && mv -f "$tmp_dl.clean" "$tmp_dl"
+            fi
+        fi
     elif has_cmd wget; then
         if ! wget -q -O "$tmp_dl" --timeout=15 --tries=2 "$UPSTREAM_URL" 2>/dev/null; then
             rm -f "$tmp_dl"
@@ -302,9 +308,12 @@ fetch_upstream() {
 
     if ! has_cmd unzip || ! unzip -t -q "$tmp_dl" >/dev/null 2>&1; then
         _err "El zip descargado está corrupto o falta unzip."
-        rm -f "$tmp_dl"
+        rm -f "$tmp_dl" "$hdr"
         return 1
     fi
+    # ETag solo tras descarga validada: evita el ETag huérfano que 304-atasca el primer arranque
+    awk 'tolower($1)=="etag:"{sub(/\r$/,"",$2); print $2; exit}' "$hdr" > "$ETAG_FILE"
+    rm -f "$hdr"
     mv -f "$tmp_dl" "$dest"
     return 0
 }
