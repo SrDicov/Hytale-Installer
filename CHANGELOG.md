@@ -12,3 +12,8 @@ Todas las notas en <https://github.com/SrDicov/Hytale-Installer/releases>.
 
 ## [0.1.2] - 2026-08-25
 - fix: purge también limpia ~/.cache/hytale-launcher legacy.
+
+## [0.1.3] - 2026-10-12
+- fix: upstream antepone cabecera `HYTALE-UPDATE` (1885 B) al zip; se recorta antes de validar (antes todo fresh-download fallaba `unzip -t`).
+- fix: `If-None-Match` solo si hay zip en caché + ETag se guarda tras validar; elimina el loop 304 infinito en primer arranque.
+- fix: la rama de descarga fallida ahora avisa el HTTP code en vez de reintentar en silencio.
